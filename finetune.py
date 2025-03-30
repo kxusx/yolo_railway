@@ -7,6 +7,7 @@ def create_data_yaml():
     data = {
         'path': '.',  # dataset root dir
         'train': 'images/train',  # train images
+        'val': 'images/train',    # validation images (using train set)
         'test': 'images/test',    # test images
         
         # Classes (using 0-based indexing as required by YOLOv8)
