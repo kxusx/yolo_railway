@@ -1,21 +1,23 @@
 from ultralytics import YOLO
 import yaml
+import os
 
 # First, create a data.yaml file
 def create_data_yaml():
     data = {
-        'path': 'train_dataset',  # dataset root dir
-        'train': 'images/train',  # train images (relative to 'path')
-        'val': 'images/val',      # val images (relative to 'path')
-        'test': 'images/test',    # test images (optional)
+        'path': '.',  # dataset root dir (modified to use current directory)
+        'train': 'images/train',  # train images
+        'val': 'images/val',      # val images
+        'test': 'images/test',    # test images
         
-        # Classes
+        # Classes (modified to match your label files which use class 1)
         'names': {
-            0: 'object'  # replace with your class name
+            1: 'object'  # class index 1 based on your label files
         },
         'nc': 1  # number of classes
     }
     
+    os.makedirs('dataset', exist_ok=True)
     with open('dataset/data.yaml', 'w') as f:
         yaml.dump(data, f, default_flow_style=False)
 
@@ -52,27 +54,66 @@ def train_yolo():
     # Train the model
     results = model.train(**args)
     
-    # Evaluate model performance on validation set
-    results = model.val()
-    
     # Export the model
     model.export(format='onnx')  # Export to ONNX format
     
     # Save the model
     model.save('best_model.pt')
+    
+ 
 
-def predict_test_images():
+def evaluate_on_test_set(model_path='best_model.pt'):
+    """
+    Evaluate the model on the test set and calculate metrics
+    """
+    import glob
+    from pathlib import Path
+    
     # Load the trained model
-    model = YOLO('best_model.pt')
+    model = YOLO(model_path)
     
-    # Run inference on test images
-    results = model('path/to/test/image.jpg')
+    # Get all test images
+    test_images = glob.glob('images/test/*.jpg') + glob.glob('images/test/*.jpeg') + glob.glob('images/test/*.png')
     
-    # Print results
-    for r in results:
-        print(f"Detected {len(r.boxes)} objects")
-        for box in r.boxes:
-            print(f"Class: {box.cls}, Confidence: {box.conf:.2f}, Box: {box.xyxy}")
+    # Create directory for predictions
+    os.makedirs('predictions/test', exist_ok=True)
+    
+    # Run predictions on test images and save results
+    for img_path in test_images:
+        results = model(img_path)
+        
+        # Get the corresponding prediction file path
+        img_name = Path(img_path).stem
+        pred_path = f'predictions/test/{img_name}.txt'
+        
+        # Save predictions in YOLO format
+        with open(pred_path, 'w') as f:
+            for r in results:
+                for box in r.boxes:
+                    # Get class, confidence and normalized box coordinates
+                    cls = int(box.cls[0])
+                    conf = float(box.conf[0])
+                    x_center, y_center, width, height = box.xywhn[0].tolist()
+                    
+                    # Write in YOLO format
+                    f.write(f"{cls} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
+    
+    # Compare predictions with ground truth
+    from generate_test_labels import compare_predictions
+    results = compare_predictions('labels/test', 'predictions/test')
+    
+    print("\nTest Set Evaluation Results:")
+    print(f"Precision: {results['precision']:.4f}")
+    print(f"Recall: {results['recall']:.4f}")
+    print(f"F1 Score: {results['f1_score']:.4f}")
+    print("\nDetailed Metrics:")
+    print(f"Total Ground Truth Boxes: {results['metrics']['total_gt']}")
+    print(f"Total Predicted Boxes: {results['metrics']['total_pred']}")
+    print(f"True Positives: {results['metrics']['true_positives']}")
+    print(f"False Positives: {results['metrics']['false_positives']}")
+    print(f"False Negatives: {results['metrics']['false_negatives']}")
+    
+    return results
 
 if __name__ == "__main__":
     # Create data.yaml file
@@ -80,6 +121,8 @@ if __name__ == "__main__":
     
     # Train the model
     train_yolo()
+    # print("\nValidation Results:")
+    # print(val_results)
     
-    # Optional: test the model
-    predict_test_images()
+    # Evaluate on test set
+    test_results = evaluate_on_test_set()
