@@ -2,7 +2,32 @@ from ultralytics import YOLO
 import yaml
 import os
 
-# First, create a data.yaml file
+def fix_label_files():
+    """Fix label files by converting class index 1 to 0"""
+    import glob
+    from pathlib import Path
+    
+    # Process both train and test labels
+    for split in ['train', 'test']:
+        label_files = glob.glob(f'labels/{split}/*.txt')
+        print(f"Processing {len(label_files)} {split} label files...")
+        
+        for label_path in label_files:
+            with open(label_path, 'r') as f:
+                lines = f.readlines()
+            
+            # Convert class index from 1 to 0
+            fixed_lines = []
+            for line in lines:
+                parts = line.strip().split()
+                if parts and parts[0] == '1':  # if class index is 1
+                    parts[0] = '0'  # change to 0
+                    fixed_lines.append(' '.join(parts) + '\n')
+            
+            # Write back the fixed labels
+            with open(label_path, 'w') as f:
+                f.writelines(fixed_lines)
+
 def create_data_yaml():
     current_dir = os.getcwd()  # Get current working directory
     data = {
@@ -12,8 +37,8 @@ def create_data_yaml():
         'test': os.path.join(current_dir, 'images/test'),    # test images
         
         # Classes (using 0-based indexing)
-        'names': ['background', 'object'],  # class names
-        'nc': 2  # number of classes
+        'names': ['object'],  # single class, index 0
+        'nc': 1  # number of classes (just one class)
     }
     
     os.makedirs('dataset', exist_ok=True)
@@ -163,8 +188,16 @@ def verify_dataset():
     return valid_pairs > 0
 
 if __name__ == "__main__":
+    # Fix label files first
+    fix_label_files()
+    
     # Create data.yaml file
     create_data_yaml()
+    
+    # Clear the cache if it exists
+    cache_file = 'labels/train.cache'
+    if os.path.exists(cache_file):
+        os.remove(cache_file)
     
     # Verify dataset before training
     if not verify_dataset():
