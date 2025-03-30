@@ -4,11 +4,12 @@ import os
 
 # First, create a data.yaml file
 def create_data_yaml():
+    current_dir = os.getcwd()  # Get current working directory
     data = {
-        'path': '.',  # dataset root dir
-        'train': 'images/train',  # train images
-        'val': 'images/train',    # validation images (using train set)
-        'test': 'images/test',    # test images
+        'path': current_dir,  # dataset root dir
+        'train': os.path.join(current_dir, 'images/train'),  # train images
+        'val': os.path.join(current_dir, 'images/train'),    # validation images
+        'test': os.path.join(current_dir, 'images/test'),    # test images
         
         # Classes (using 0-based indexing as required by YOLOv8)
         'names': {
