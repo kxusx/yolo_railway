@@ -5,9 +5,8 @@ import os
 # First, create a data.yaml file
 def create_data_yaml():
     data = {
-        'path': '.',  # dataset root dir (modified to use current directory)
+        'path': '.',  # dataset root dir
         'train': 'images/train',  # train images
-        'val': 'images/val',      # val images
         'test': 'images/test',    # test images
         
         # Classes (using 0-based indexing as required by YOLOv8)
@@ -49,6 +48,7 @@ def train_yolo():
         'save': True,               # save train checkpoints
         'save_period': -1,          # Save checkpoint every x epochs (disabled if < 1)
         'cache': False,             # cache images for faster training
+        'val': False,               # disable validation
     }
     
     # Train the model
