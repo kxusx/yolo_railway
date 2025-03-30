@@ -51,18 +51,28 @@ def train_yolo():
         'save_period': -1,          # Save checkpoint every x epochs (disabled if < 1)
         'cache': False,             # cache images for faster training
         'val': False,               # disable validation
+        'amp': False,               # disable automatic mixed precision
+        'half': False,              # disable half precision
     }
     
-    # Train the model
-    results = model.train(**args)
-    
-    # Export the model
-    model.export(format='onnx')  # Export to ONNX format
-    
-    # Save the model
-    model.save('best_model.pt')
-    
-    return results
+    try:
+        # Train the model
+        results = model.train(**args)
+        
+        # Export the model
+        model.export(format='onnx')  # Export to ONNX format
+        
+        # Save the model
+        model.save('best_model.pt')
+        
+        return results
+    except RuntimeError as e:
+        print(f"CUDA error encountered. Trying CPU training instead...")
+        args['device'] = 'cpu'
+        results = model.train(**args)
+        model.export(format='onnx')
+        model.save('best_model.pt')
+        return results
 
 def evaluate_on_test_set(model_path='best_model.pt'):
     """
