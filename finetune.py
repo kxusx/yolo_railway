@@ -52,7 +52,7 @@ def train_yolo():
     # Training arguments
     args = {
         'data': 'dataset/data.yaml',  # path to data.yaml
-        'epochs': 100,                # number of epochs
+        'epochs': 15,                # number of epochs
         'imgsz': 640,                # image size
         'batch': 16,                 # batch size
         'device': 0,                 # cuda device, i.e. 0 or 0,1,2,3 or cpu
