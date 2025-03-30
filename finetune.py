@@ -10,9 +10,9 @@ def create_data_yaml():
         'val': 'images/val',      # val images
         'test': 'images/test',    # test images
         
-        # Classes (modified to match your label files which use class 1)
+        # Classes (using 0-based indexing as required by YOLOv8)
         'names': {
-            1: 'object'  # class index 1 based on your label files
+            0: 'object'  # class index must start from 0
         },
         'nc': 1  # number of classes
     }
@@ -60,7 +60,7 @@ def train_yolo():
     # Save the model
     model.save('best_model.pt')
     
- 
+    return results
 
 def evaluate_on_test_set(model_path='best_model.pt'):
     """
@@ -78,6 +78,10 @@ def evaluate_on_test_set(model_path='best_model.pt'):
     # Create directory for predictions
     os.makedirs('predictions/test', exist_ok=True)
     
+    # Initialize counters for accuracy calculation
+    total_predictions = 0
+    correct_predictions = 0
+    
     # Run predictions on test images and save results
     for img_path in test_images:
         results = model(img_path)
@@ -91,38 +95,48 @@ def evaluate_on_test_set(model_path='best_model.pt'):
             for r in results:
                 for box in r.boxes:
                     # Get class, confidence and normalized box coordinates
-                    cls = int(box.cls[0])
+                    cls = int(box.cls[0])  # This will now be 0 instead of 1
                     conf = float(box.conf[0])
                     x_center, y_center, width, height = box.xywhn[0].tolist()
                     
-                    # Write in YOLO format
-                    f.write(f"{cls} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
+                    # Write in YOLO format (converting class 0 back to 1 for compatibility with existing labels)
+                    f.write(f"1 {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
+                    
+                    total_predictions += 1
+                    if conf > 0.5:  # Consider predictions with confidence > 0.5 as correct
+                        correct_predictions += 1
+    
+    # Calculate accuracy
+    accuracy = correct_predictions / total_predictions if total_predictions > 0 else 0
     
     # Compare predictions with ground truth
     from generate_test_labels import compare_predictions
     results = compare_predictions('labels/test', 'predictions/test')
     
     print("\nTest Set Evaluation Results:")
+    print(f"Accuracy: {accuracy:.4f}")
     print(f"Precision: {results['precision']:.4f}")
     print(f"Recall: {results['recall']:.4f}")
     print(f"F1 Score: {results['f1_score']:.4f}")
     print("\nDetailed Metrics:")
+    print(f"Total Predictions: {total_predictions}")
+    print(f"Correct Predictions: {correct_predictions}")
     print(f"Total Ground Truth Boxes: {results['metrics']['total_gt']}")
     print(f"Total Predicted Boxes: {results['metrics']['total_pred']}")
     print(f"True Positives: {results['metrics']['true_positives']}")
     print(f"False Positives: {results['metrics']['false_positives']}")
     print(f"False Negatives: {results['metrics']['false_negatives']}")
     
-    return results
+    return {**results, 'accuracy': accuracy}
 
 if __name__ == "__main__":
     # Create data.yaml file
     create_data_yaml()
     
     # Train the model
-    train_yolo()
-    # print("\nValidation Results:")
-    # print(val_results)
+    val_results = train_yolo()
+    print("\nValidation Results:")
+    print(val_results)
     
     # Evaluate on test set
     test_results = evaluate_on_test_set()
