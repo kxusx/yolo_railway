@@ -11,11 +11,11 @@ def create_data_yaml():
         'val': os.path.join(current_dir, 'images/train'),    # validation images
         'test': os.path.join(current_dir, 'images/test'),    # test images
         
-        # Classes (using 0-based indexing as required by YOLOv8)
+        # Classes (using 1-based indexing to match your labels)
         'names': {
-            0: 'object'  # class index must start from 0
+            1: 'object'  # class index 1 to match your existing labels
         },
-        'nc': 1  # number of classes
+        'nc': 2  # number of classes (0 and 1)
     }
     
     os.makedirs('dataset', exist_ok=True)
@@ -141,9 +141,37 @@ def evaluate_on_test_set(model_path='best_model.pt'):
     
     return {**results, 'accuracy': accuracy}
 
+def verify_dataset():
+    import glob
+    from pathlib import Path
+    
+    # Get all training images
+    image_files = glob.glob('images/train/*.jpg') + glob.glob('images/train/*.jpeg') + glob.glob('images/train/*.png')
+    
+    print(f"Found {len(image_files)} images in training directory")
+    
+    valid_pairs = 0
+    for img_path in image_files:
+        img_name = Path(img_path).stem
+        label_path = f'labels/train/{img_name}.txt'
+        
+        if os.path.exists(label_path):
+            valid_pairs += 1
+        else:
+            print(f"Missing label file for {img_path}")
+    
+    print(f"Found {valid_pairs} valid image-label pairs")
+    
+    return valid_pairs > 0
+
 if __name__ == "__main__":
     # Create data.yaml file
     create_data_yaml()
+    
+    # Verify dataset before training
+    if not verify_dataset():
+        print("No valid image-label pairs found. Please check your dataset structure.")
+        exit(1)
     
     # Train the model
     val_results = train_yolo()
