@@ -11,11 +11,9 @@ def create_data_yaml():
         'val': os.path.join(current_dir, 'images/train'),    # validation images
         'test': os.path.join(current_dir, 'images/test'),    # test images
         
-        # Classes (using 1-based indexing to match your labels)
-        'names': {
-            1: 'object'  # class index 1 to match your existing labels
-        },
-        'nc': 2  # number of classes (0 and 1)
+        # Classes (using 0-based indexing)
+        'names': ['background', 'object'],  # class names
+        'nc': 2  # number of classes
     }
     
     os.makedirs('dataset', exist_ok=True)
