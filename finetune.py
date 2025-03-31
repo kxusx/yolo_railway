@@ -23,6 +23,8 @@ def fix_label_files():
                 if parts and parts[0] == '1':  # if class index is 1
                     parts[0] = '0'  # change to 0
                     fixed_lines.append(' '.join(parts) + '\n')
+                else:
+                    fixed_lines.append(line)  # keep original line if not class 1
             
             # Write back the fixed labels
             with open(label_path, 'w') as f:
@@ -189,12 +191,14 @@ def verify_dataset():
     
     for img_path in image_files:
         img_name = Path(img_path).stem
+        print(img_name)
         label_path = f'labels/train/{img_name}.txt'
         
         if os.path.exists(label_path):
             # Check if label file has content
             with open(label_path, 'r') as f:
                 content = f.read().strip()
+                print(content)
                 if content:
                     valid_pairs += 1
                 else:
@@ -216,7 +220,7 @@ if __name__ == "__main__":
     os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
     
-    # Fix label files first
+    # Fix label files first - uncomment this!
     fix_label_files()
     
     # Create data.yaml file
