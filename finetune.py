@@ -49,53 +49,71 @@ def train_yolo():
     # Load a pretrained YOLOv8 model
     model = YOLO('yolov8n.pt')  # n is for nano, you can use s/m/l/x for larger models
     
-    # Training arguments
+    # Training arguments with more conservative settings
     args = {
         'data': 'dataset/data.yaml',  # path to data.yaml
-        'epochs': 15,                # number of epochs
-        'imgsz': 640,                # image size
-        'batch': 16,                 # batch size
-        'device': 0,                 # cuda device, i.e. 0 or 0,1,2,3 or cpu
-        'workers': 8,                # number of worker threads
-        'patience': 50,              # early stopping patience
-        'project': 'runs/train',     # save results to project/name
-        'name': 'exp1',              # experiment name
-        'pretrained': True,          # use pretrained model
-        'optimizer': 'Adam',         # optimizer to use (SGD, Adam)
-        'lr0': 0.001,               # initial learning rate
+        'epochs': 100,               # number of epochs
+        'imgsz': 640,               # image size
+        'batch': 8,                 # reduced batch size
+        'device': 0,                # cuda device
+        'workers': 4,               # reduced worker threads
+        'patience': 50,             # early stopping patience
+        'project': 'runs/train',    # save results to project/name
+        'name': 'exp1',             # experiment name
+        'pretrained': True,         # use pretrained model
+        'optimizer': 'SGD',         # changed to SGD for better stability
+        'lr0': 0.0001,             # reduced learning rate
         'weight_decay': 0.0005,     # weight decay
-        'warmup_epochs': 3,         # warmup epochs
-        'warmup_momentum': 0.8,     # warmup momentum
-        'warmup_bias_lr': 0.1,      # warmup initial bias lr
+        'warmup_epochs': 5,         # increased warmup epochs
+        'warmup_momentum': 0.5,     # reduced warmup momentum
+        'warmup_bias_lr': 0.05,     # reduced warmup bias lr
         'box': 7.5,                 # box loss gain
         'cls': 0.5,                 # cls loss gain
-        'dfl': 1.5,                 # dfl loss gain
-        'save': True,               # save train checkpoints
-        'save_period': -1,          # Save checkpoint every x epochs (disabled if < 1)
-        'cache': False,             # cache images for faster training
-        'val': False,               # disable validation
-        'amp': False,               # disable automatic mixed precision
-        'half': False,              # disable half precision
+        'dfl': 1.5,                # dfl loss gain
+        'save': True,              # save train checkpoints
+        'save_period': 10,         # save checkpoint every 10 epochs
+        'cache': False,            # cache images for faster training
+        'val': True,               # enable validation
+        'amp': False,              # disable automatic mixed precision
+        'fraction': 1.0,           # fraction of dataset to use
+        'exist_ok': True,          # existing project/name ok, do not increment
+        'seed': 42                 # set random seed for reproducibility
     }
     
     try:
-        # Train the model
-        results = model.train(**args)
-        
-        # Export the model
-        model.export(format='onnx')  # Export to ONNX format
-        
-        # Save the model
-        model.save('best_model.pt')
-        
-        return results
-    except RuntimeError as e:
-        print(f"CUDA error encountered. Trying CPU training instead...")
-        args['device'] = 'cpu'
+        # First try with CUDA
+        print("Attempting training with CUDA...")
         results = model.train(**args)
         model.export(format='onnx')
         model.save('best_model.pt')
         return results
+        
+    except RuntimeError as e:
+        if "CUDA" in str(e):
+            print("CUDA error encountered. Trying with different CUDA settings...")
+            # Try with different CUDA settings
+            args['device'] = 'cuda:0'
+            args['batch'] = 4  # Further reduce batch size
+            try:
+                results = model.train(**args)
+                model.export(format='onnx')
+                model.save('best_model.pt')
+                return results
+            except Exception as cuda_e:
+                print("CUDA still failing. Falling back to CPU...")
+                args['device'] = 'cpu'
+                args['batch'] = 2  # Minimum batch size for CPU
+                args['workers'] = 2  # Reduce workers for CPU
+                try:
+                    results = model.train(**args)
+                    model.export(format='onnx')
+                    model.save('best_model.pt')
+                    return results
+                except Exception as cpu_e:
+                    raise Exception(f"Training failed on both CUDA and CPU. Last error: {str(cpu_e)}")
+        else:
+            # If it's not a CUDA error, re-raise the exception
+            raise e
 
 def evaluate_on_test_set(model_path='best_model.pt'):
     """
@@ -188,6 +206,10 @@ def verify_dataset():
     return valid_pairs > 0
 
 if __name__ == "__main__":
+    # Set environment variables for better CUDA handling
+    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
+    
     # Fix label files first
     fix_label_files()
     
@@ -205,9 +227,13 @@ if __name__ == "__main__":
         exit(1)
     
     # Train the model
-    val_results = train_yolo()
-    print("\nValidation Results:")
-    print(val_results)
-    
-    # Evaluate on test set
-    test_results = evaluate_on_test_set()
+    try:
+        val_results = train_yolo()
+        print("\nValidation Results:")
+        print(val_results)
+        
+        # Evaluate on test set
+        test_results = evaluate_on_test_set()
+    except Exception as e:
+        print(f"Training failed with error: {str(e)}")
+        print("Please check your dataset and CUDA configuration.")
