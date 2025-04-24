@@ -54,7 +54,7 @@ def train_yolo():
     # Training arguments with more conservative settings
     args = {
         'data': 'dataset/data.yaml',
-        'epochs': 100,
+        'epochs': 10,
         'imgsz': 640,
         'batch': 8,
         'device': 0,
